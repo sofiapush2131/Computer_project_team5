@@ -170,7 +170,8 @@ def recommend(user_id, rank, index, all_nodes, top_k=5):
         # Recommend only items, skip users
         if node != user_id and not str(node).startswith("user"):
             idx = index[node]
-            scores.append((node, rank[idx]))
+            if (node, rank[idx]) not in scores:
+                scores.append((node, rank[idx]))
 
     scores.sort(key=lambda x: x[1], reverse=True)
     return scores[:top_k]
