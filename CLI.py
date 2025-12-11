@@ -5,39 +5,33 @@ from pagerank import (
     recommend,
 )
 
-users = ['user1', 'user2', 'user3']
-items = ['songA', 'songB', 'songC', 'songD']
-
-interactions = [
-    ('user1', 'songA'),
-    ('user1', 'songB'),
-    ('user2', 'songA'),
-    ('user3', 'songC'),
-]
-
 
 def main():
     parser = argparse.ArgumentParser(description='Recommendation System CLI')
 
-    parser.add_argument('-u', '--user', type=str,
-                        help='User ID to recommend for')
-    parser.add_argument('--top', type=int, default=5,
-                        help='Top-K recommendations')
+    parser.add_argument('--user', type=str, help='User ID to recommend for')
+    parser.add_argument('--top', type=int, default=5, help='Top-K recommendations')
+    parser.add_argument('--filename', type=str,default='users.csv',help='Filename with interactions' )
+    parser.add_argument('--pagerank', action='store_true', help='Print PageRank scores')
+    parser.add_argument('--damping', type=float, default=0.85, help='Damping factor')
+    parser.add_argument('--max-iter', type=int, default=100, help='Max PageRank iterations')
 
-    parser.add_argument('--pagerank', action='store_true',
-                        help='Print PageRank scores')
-    parser.add_argument('--damping', type=float,
-                        default=0.85, help='Damping factor')
-    parser.add_argument('--max-iter', type=int, default=100,
-                        help='Max PageRank iterations')
-
-    parser.add_argument('--graph', action='store_true',
-                        help='Print graph connections')
+    parser.add_argument('--graph', action='store_true', help='Print graph connections')
 
     args = parser.parse_args()
 
-    matrix, index, all_nodes = build_interaction_graph(
-        items, users, interactions)
+    users =[]
+    items = []
+    interactions = []
+    with open(args.filename,'r',encoding='utf-8') as f:
+        for line in f:
+            u ,i = line.strip().split(',')
+            users.append(u)
+            items.append(i)
+            interactions.append((u,i))
+
+    matrix, index, all_nodes = build_interaction_graph(items, users, interactions)
+
 # 1
     if args.user:
         if args.user not in users:
@@ -73,6 +67,6 @@ if __name__ == '__main__':
     main()
 
 
-# python CLI.py --user user1 --top 3
-# python CLI.py --pagerank --damping 0.9
-# python CLI.py --graph
+# python CLI.py --user user1 --top 3 --filename users.csv
+# python CLI.py --pagerank --damping 0.9 --filename users.csv
+# python CLI.py --graph --filename users.csv
