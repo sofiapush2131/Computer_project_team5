@@ -133,4 +133,4 @@ if __name__ == "__main__":
         print(f"{item}: {score:.4f}")
 
     import doctest
-    doctest.testmod()
+    print(doctest.testmod())
