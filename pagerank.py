@@ -1,205 +1,104 @@
-"""Module PageRank algorithm"""
+"""
+Module: Universal PageRank algorithm
+Provides functions to build any directed graph, compute PageRank scores,
+and recommend top nodes based on PageRank.
+"""
+
 import numpy as np
 
 
-def normalize_matrix(matrix):
-    """
-    Normalize the adjacency matrix so that each column sums to 1.
-    This is necessary for the PageRank algorithm to work correctly.
-
-    Parameters
-    ----------
-    matrix : numpy.ndarray
-        Raw adjacency matrix.
-
-    Returns
-    -------
-    numpy.ndarray
-        Column-normalized matrix.
-    >>> import numpy as np
-    >>> M = np.array([[0, 1],
-    ...               [1, 0]])
-    >>> normalize_matrix(M)
-    array([[0., 1.],
-           [1., 0.]])
-    >>> M = np.array([
-    ...     [0, 2, 0],
-    ...     [3, 3, 0],
-    ...     [0, 1, 0]
-    ... ], float)
-    >>> normalize_matrix(M)
-    array([[0.        , 0.33333333, 0.        ],
-           [1.        , 0.5       , 0.        ],
-           [0.        , 0.16666667, 0.        ]])
-    """
+def normalize_matrix(matrix: np.ndarray) -> np.ndarray:
+    """Normalize adjacency matrix columns to sum to 1."""
     col_sums = matrix.sum(axis=0)
-    col_sums[col_sums == 0] = 1  # Prevent division by zero for isolated nodes
+    col_sums[col_sums == 0] = 1
     return matrix / col_sums
 
 
-def pagerank(matrix, d=0.85, max_iter=100, tol=1e-6):
+def pagerank(matrix: np.ndarray, damping: float = 0.85, max_iter: int = 100, tol: float = 1e-6) -> np.ndarray:
     """
-    Compute PageRank scores for all nodes in the graph.
+    Compute PageRank for any directed graph using power iteration.
 
-    Parameters
-    ----------
-    matrix : numpy.ndarray
-        Normalized adjacency matrix.
-    d : float, optional
-        Damping factor (default is 0.85).
-    max_iter : int, optional
-        Maximum number of iterations (default is 100).
-    tol : float, optional
-        Convergence tolerance (default is 1e-6).
+    Args:
+        matrix (np.ndarray): adjacency matrix
+        damping (float): damping factor
+        max_iter (int): maximum iterations
+        tol (float): tolerance for convergence
 
-    Returns
-    -------
-    numpy.ndarray
-        Vector of PageRank scores for each node.
-    >>> import numpy as np
-    >>> M = np.array([
-    ...     [0, 1],
-    ...     [1, 0]
-    ... ], float)
-    >>> pagerank(M)
-    array([0.5, 0.5])
+    Returns:
+        np.ndarray: PageRank scores
     """
     n = matrix.shape[0]
     matrix_norm = normalize_matrix(matrix)
-
-    rank = np.ones(n) / n  # Initial PageRank values
-    teleport = np.ones(n) / n  # Teleportation vector
+    rank = np.ones(n) / n
+    teleport = np.ones(n) / n
 
     for _ in range(max_iter):
-        new_rank = d * matrix_norm.dot(rank) + (1 - d) * teleport
-
-        # Check convergence
-        if np.linalg.norm(new_rank - rank) < tol:
+        new_rank = damping * matrix_norm.dot(rank) + (1 - damping) * teleport
+        if np.linalg.norm(new_rank - rank, 1) < tol:
             break
-
         rank = new_rank
 
     return rank
 
 
-def build_interaction_graph(items, users, interactions):
+def build_graph(nodes: list, edges: list) -> tuple:
     """
-    Construct a graph representation (adjacency matrix) from user-item interactions.
+    Build adjacency matrix for any directed graph.
 
-    The graph is bipartite:
-        user <-> item
-    Meaning that edges exist between a user and an item if the user interacted with it.
+    Args:
+        nodes (list): list of node IDs
+        edges (list): list of tuples (source, target)
 
-    Parameters
-    ----------
-    items : list
-        List of item IDs (products, songs, movies, etc.).
-    users : list
-        List of user IDs.
-    interactions : list of tuples
-        Each tuple is (user_id, item_id) meaning that user interacted with this item.
-
-    Returns
-    -------
-    marix : numpy.ndarray
-        Adjacency matrix of the graph.
-    index : dict
-        Mapping from node ID to numeric index.
-    all_nodes : list
-        List of all nodes (users + items) in index order.
-    >>> import numpy as np
-    >>> items = ["i1", "i2"]
-    >>> users = ["u1", "u2"]
-    >>> interactions = [
-    ...     ("u1", "i1"),
-    ...     ("u2", "i2")
-    ... ]
-    >>> build_interaction_graph(items, users, interactions)
-    (array([[0., 0., 1., 0.],
-           [0., 0., 0., 1.],
-           [1., 0., 0., 0.],
-           [0., 1., 0., 0.]]), {'u1': 0, 'u2': 1, 'i1': 2, 'i2': 3}, ['u1', 'u2', 'i1', 'i2'])
+    Returns:
+        tuple: adjacency matrix, index mapping, list of nodes
     """
-    all_nodes = users + items
-    n = len(all_nodes)
-
-    index = {node: i for i, node in enumerate(all_nodes)}
+    n = len(nodes)
+    index = {node: i for i, node in enumerate(nodes)}
     matrix = np.zeros((n, n))
 
-    # Create bi-directional edges between user and item
-    for user, item in interactions:
-        ui = index[user]
-        ii = index[item]
+    for src, tgt in edges:
+        matrix[index[tgt], index[src]] = 1  # column = source, row = target
 
-        matrix[ii][ui] = 1  # user → item
-        matrix[ui][ii] = 1  # item → user
-
-    return matrix, index, all_nodes
+    return matrix, index, nodes
 
 
-def recommend(user_id, rank, index, all_nodes, top_k=5):
+def recommend(node_id: str, rank: np.ndarray, index: dict, candidates: list, top_k: int = 5) -> list:
     """
-    Generate a list of top-k recommended items for a given user.
+    Recommend top-k nodes from any set of candidates based on PageRank scores.
 
-    Parameters
-    ----------
-    user_id : str
-        ID of the user for whom recommendations are generated.
-    rank : numpy.ndarray
-        PageRank score for each node.
-    index : dict
-        Mapping from node to matrix index.
-    all_nodes : list
-        List of all nodes in index order.
-    top_k : int, optional
-        Number of recommendations to return (default is 5).
+    Args:
+        node_id (str): node to exclude from recommendations
+        rank (np.ndarray): PageRank scores
+        index (dict): mapping node -> matrix index
+        candidates (list): nodes to consider for recommendation
+        top_k (int): number of recommendations
 
-    Returns
-    -------
-    list of tuples
-        Each tuple contains (item_id, score) sorted by score in descending order.
-    >>> import numpy as np
-    >>> rank = np.array([0.1, 0.4, 0.3, 0.2])
-    >>> all_nodes = ["user1", "user2", "itemA", "itemB"]
-    >>> index = {"user1": 0, "user2": 1, "itemA": 2, "itemB": 3}
-    >>> recommend("user1", rank, index, all_nodes, top_k=2)
-    [('itemA', np.float64(0.3)), ('itemB', np.float64(0.2))]
+    Returns:
+        list: top-k recommendations as tuples (node, score)
     """
-    scores = []
-    for node in all_nodes:
-        # Recommend only items, skip users
-        if node != user_id and not str(node).startswith("user"):
-            idx = index[node]
-            if (node, rank[idx]) not in scores:
-                scores.append((node, rank[idx]))
-
+    scores = [(node, rank[index[node]]) for node in candidates if node != node_id]
     scores.sort(key=lambda x: x[1], reverse=True)
     return scores[:top_k]
 
 
-# Example of usage
+# Example usage
 if __name__ == "__main__":
-    users = ["user1", "user2", "user3"]
-    items = ["songA", "songB", "songC", "songD"]
-
-    interactions = [
-        ("user1", "songA"),
-        ("user1", "songB"),
-        ("user2", "songA"),
-        ("user3", "songC"),
+    # Example: a graph where any node can be connected to any node
+    nodes_list = ["A", "B", "C", "D", "E"]
+    edges_list = [
+        ("A", "B"),
+        ("A", "C"),
+        ("B", "D"),
+        ("C", "D"),
+        ("D", "E"),
+        ("E", "A"),  # creating a cycle
     ]
 
-    matrix, index, all_nodes = build_interaction_graph(
-        items, users, interactions)
+    adjacency_matrix, node_index, all_nodes = build_graph(nodes_list, edges_list)
+    page_rank_scores = pagerank(adjacency_matrix)
 
-    ranks = pagerank(matrix)
+    recommendations = recommend("A", page_rank_scores, node_index, all_nodes, top_k=3)
 
-    recs = recommend("user1", ranks, index, all_nodes, top_k=3)
-
-    print("Recommendations for user1:")
-    for item, score in recs:
-        print(f"{item}: {score:.4f}")
-
-if __name__ == "__main__":
-    import doctest
-    print(doctest.testmod())
+    print("Recommendations for A:")
+    for node, score in recommendations:
+        print(f"{node}: {score:.4f}")
